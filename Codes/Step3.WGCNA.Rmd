@@ -1,0 +1,768 @@
+---
+title: "Step3.WGCNA"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo                  = TRUE
+                      ,warning              = FALSE
+                      ,message              = FALSE
+                      ,error                = TRUE
+                      ,dev                  = c('png','pdf')
+                      ,pdf.options(encoding = "ISOLatin9.enc", useKerning=FALSE, useDingbats=FALSE)
+)                      
+```
+
+```{r library}
+library(Seurat)
+library(ggplot2)
+library(ggpubr)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(EnsDb.Hsapiens.v86)
+library(WGCNA)
+library(tidyverse)
+library(stringr)
+
+
+```
+
+```{r loading data}
+load("./Step1.Data_processing.Rdata")
+load("./Step2.Pseudobulk.Rdata")
+
+# reading in the protein data
+protein_normalized <- read_csv("../protein_normalized.csv")
+protein_normalized = protein_normalized[!duplicated(protein_normalized$Gene_Symbol),]
+protein_normalized <- protein_normalized[complete.cases(protein_normalized[ , 2]),]
+
+protein.table <- as.data.frame(protein_normalized[,-c(1:6)])
+rownames(protein.table) <- protein_normalized$Gene_Symbol
+
+protein.table[is.na(protein.table)] = 0
+
+```
+
+```{r norm}
+# Normalazing Raw pseudobulk data
+Log_n <- LogNormalize(as.matrix(Pseudo_Bulk), scale.factor = 10000)
+Log_n <- CreateSeuratObject(Log_n)
+Log_n <- as.data.frame(Log_n@assays$RNA@data)
+Log_n <- Log_n[rowSums(Log_n[])>0,]
+
+Log_n = readRDS("/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/All44-sets/Log_n.rds");
+
+```
+
+
+```{r removing outliers and low variance genes}
+
+# The following setting is important, do not omit.
+options(stringsAsFactors = FALSE);
+
+# Finding outliers 
+
+##  Transcriptomics dataset
+Log_BC.clust <- hclust(dist(t(Log_n)), method = "average")
+plot(Log_BC.clust, main="Log_n")
+
+abline(h = 34, col = "red");
+# Determine cluster under the line
+clust = cutreeStatic(Log_BC.clust, cutHeight = 34, minSize = 10)
+# clust 1 contains the samples we want to keep.
+keepSamples = (clust!=0)
+gene.table <- Log_n[,keepSamples ]
+
+gene.table <-  gene.table[,1:17]
+gene.table$sd <- rowSds(as.matrix(gene.table))
+sd_dens_gene <- density(gene.table$sd)
+plot(sd_dens_gene, xlab="SD_Gene expression", ylab="Density", main="Density plot")
+print(quantile(gene.table$sd , probs = seq(0, 1, 1/8)))
+gene.table <- subset(gene.table, subset=sd > 0.0046304313)
+gene.table<- gene.table[,-18]
+
+
+# Protein dataset
+Pro_BC.clust <- hclust(dist(t(protein.table)), method = "average")
+plot(Pro_BC.clust, main="Protein")
+
+abline(h = 107, col = "red");
+# Determine cluster under the line
+clust.pro = cutreeStatic(Pro_BC.clust, cutHeight = 107, minSize = 10)
+# clust 1 contains the samples we want to keep.
+keepSamples = (clust.pro!=0)
+protein.table <- protein.table[,keepSamples ]
+
+protein.table <- readRDS( "/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/protein.table.rds");
+
+```
+
+
+```{r}
+
+
+gene.table_t = as.data.frame(t(gene.table));
+protein.table_t = as.data.frame(t(protein.table));
+
+gsg.gene = goodSamplesGenes(gene.table_t, verbose = 3);
+gsg.gene$allOK
+
+gsg.pro = goodSamplesGenes(protein.table_t, verbose = 3);
+gsg.pro$allOK
+
+
+if (!gsg.gene$allOK)
+{
+  # Optionally, print the gene and sample names that were removed:
+  if (sum(!gsg.gene$goodGenes)>0) 
+    printFlush(paste("Removing genes:", paste(names(gene.table_t)[!gsg.gene$goodGenes], collapse = ", ")));
+  if (sum(!gsg.gene$goodSamples)>0) 
+    printFlush(paste("Removing samples:", paste(rownames(gene.table_t)[!gsg.gene$goodSamples], collapse = ", ")));
+  # Remove the offending genes and samples from the data:
+  gene.table_t = gene.table_t[gsg.gene$goodSamples, gsg.gene$goodGenes]
+}
+
+
+if (!gsg.pro$allOK)
+{
+  # Optionally, print the gene and sample names that were removed:
+  if (sum(!gsg.pro$goodGenes)>0) 
+    printFlush(paste("Removing genes:", paste(names(protein.table_t)[!gsg.pro$goodGenes], collapse = ", ")));
+  if (sum(!gsg.pro$goodSamples)>0) 
+    printFlush(paste("Removing samples:", paste(rownames(protein.table_t)[!gsg.pro$goodSamples], collapse = ", ")));
+  # Remove the offending genes and samples from the data:
+  protein.table_t = protein.table_t[gsg.pro$goodSamples, gsg.pro$goodGenes]
+}
+
+
+```
+
+```{r}
+datExprGene=gene.table_t
+datExprProtein=protein.table_t
+
+nGenes.Gene = ncol(datExprGene)
+nSamples.Gene = nrow(datExprGene)
+
+nGenes.Protein = ncol(datExprProtein)
+nSamples.Protein = nrow(datExprProtein)
+
+traitDataGene = data.frame(id=rownames(datExprGene) , subtype= 
+                         c(rep((1),3),rep((2),8), rep((3),6)))
+traitDataProtein = data.frame(id=rownames(datExprProtein) , subtype= 
+                         c(rep((1),3),rep((2),5), rep((3),9)))
+
+
+dim(traitDataGene)
+names(traitDataProtein)
+
+# remove columns that hold information we do not need.
+allTraitsGene = traitDataGene
+allTraitsProtein = traitDataProtein
+
+
+GeneSamples = rownames(datExprGene);
+ProteinSamples = rownames(datExprProtein);
+
+traitRowsGene = match(GeneSamples, allTraitsGene$id);
+traitRowsProtein = match(ProteinSamples, allTraitsProtein$id);
+
+datTraitsGene = as.data.frame(allTraitsGene[traitRowsGene, -1]);
+datTraitsProtein = as.data.frame(allTraitsProtein[traitRowsProtein, -1]);
+
+rownames(datTraitsGene) = allTraitsGene[traitRowsGene, 1];
+rownames(datTraitsProtein) = allTraitsProtein[traitRowsProtein, 1];
+colnames(datTraitsGene) <- "Subtypes"
+colnames(datTraitsProtein) <- "Subtypes"
+
+collectGarbage()
+
+
+
+# Re-cluster samples
+GeneTree = hclust(dist(datExprGene), method = "average")
+ProteinTree = hclust(dist(datExprProtein), method = "average")
+
+# Convert traits to a color representation: white means low, red means high, grey means missing entry
+traitColorsGene = numbers2colors(datTraitsGene, signed = FALSE);
+traitColorsProtein = numbers2colors(datTraitsProtein, signed = FALSE);
+
+# Plot the sample dendrogram and the colors underneath.
+plotDendroAndColors(GeneTree, traitColorsGene,
+                    groupLabels = names(datTraitsGene), 
+                    main = "Gene dendrogram and trait heatmap", cex.colorLabels = 1.3, cex.dendroLabels = 1.3, cex.axis=1, cex.main=2)
+
+plotDendroAndColors(ProteinTree, traitColorsProtein,
+                    groupLabels = names(datTraitsProtein), 
+                    main = "Protein dendrogram and trait heatmap", cex.colorLabels = 1.3, cex.dendroLabels = 1.3, cex.axis=1, cex.main=2)
+
+
+
+```
+
+
+```{r set threshold for module identification}
+# Choose a set of soft-thresholding powers
+powers = c(c(1:10), seq(from = 12, to=20, by=2))
+# Call the network topology analysis function
+sft_gene = pickSoftThreshold(datExprGene, powerVector = powers, verbose = 5)
+sft_protein = pickSoftThreshold(datExprProtein, powerVector = powers, verbose = 5)
+
+# Plot the results:
+# sizeGrWindow(9, 5)
+par(mfrow = c(1,2));
+cex1 = 0.9;
+# Scale-free topology fit index as a function of the soft-thresholding power
+plot(sft_gene$fitIndices[,1], -sign(sft_gene$fitIndices[,3])*sft_gene$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence for Genes"));
+text(sft_gene$fitIndices[,1], -sign(sft_gene$fitIndices[,3])*sft_gene$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+abline(h=0.95,col="red")
+
+plot(sft_protein$fitIndices[,1], -sign(sft_protein$fitIndices[,3])*sft_protein$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence for Proteins"));
+text(sft_protein$fitIndices[,1], -sign(sft_protein$fitIndices[,3])*sft_protein$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+# this line corresponds to using an R^2 cut-off of h
+abline(h=0.80,col="red")
+
+
+
+# Mean connectivity as a function of the soft-thresholding power
+plot(sft_gene$fitIndices[,1], sft_gene$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity for Genes"))
+text(sft_gene$fitIndices[,1], sft_gene$fitIndices[,5], labels=powers, cex=cex1,col="red")
+
+# Mean connectivity as a function of the soft-thresholding power
+plot(sft_protein$fitIndices[,1], sft_protein$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity for Proteins"))
+text(sft_protein$fitIndices[,1], sft_protein$fitIndices[,5], labels=powers, cex=cex1,col="red")
+
+
+
+```
+
+```{r finding modules}
+net.gene = blockwiseModules(datExprGene, power =8 ,
+                              deepSplit = 3 , 
+                              networkType = "signed",
+                       TOMType = "unsigned", minModuleSize = 20,
+                       reassignThreshold = 1e-1, mergeCutHeight = 0.2,
+                       numericLabels = TRUE, pamRespectsDendro = FALSE,
+                       saveTOMs = TRUE,
+                       saveTOMFileBase = "BCgeneTOM", 
+                       verbose = 3)
+
+
+net.protein = blockwiseModules(datExprProtein, power = 8,
+                                 deepSplit = 4,
+                                 networkType = "signed",
+                       TOMType = "unsigned", minModuleSize = 30,
+                       reassignThreshold = TRUE, mergeCutHeight = 0.1, corType = "bicor",
+                       numericLabels = TRUE, pamRespectsDendro = FALSE,
+                       saveTOMs = TRUE,
+                       saveTOMFileBase = "BCproteinTOM", 
+                       verbose = 3)
+
+```
+
+
+```{r}
+# open a graphics window
+# sizeGrWindow(6, 6)
+# Convert labels to colors for plotting
+mergedColorsgene = labels2colors(net.gene$colors)
+# Plot the dendrogram and the module colors underneath
+
+# Convert labels to colors for plotting
+mergedColorspro = labels2colors(net.protein$colors)
+# Plot the dendrogram and the module colors underneath
+
+pdf("FIG3.4.pdf", width=12, height=12)
+
+plotDendroAndColors(net.protein$dendrograms[[1]], mergedColorspro[net.protein$blockGenes[[1]]],
+                    "Module colors",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05, main="Protein modules",cex.colorLabels = 1.3, cex.dendroLabels = 1.3, cex.axis=1, cex.main=2)
+dev.off()
+
+
+
+
+pdf("FIG3.3.pdf", width=12, height=12)
+    plotDendroAndColors(net.gene$dendrograms[[1]], mergedColorsgene[net.gene$blockGenes[[1]]],
+                    "Module colors",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05, main="Gene modules",cex.colorLabels = 1.3, cex.dendroLabels = 1.3, cex.axis=1, cex.main=2)
+dev.off()
+
+
+
+
+
+getwd()
+setwd("../Pseudo_bulk-proteomics/Pics/")
+
+moduleLabelsgenes = net.gene$colors
+moduleLabelspro = net.protein$colors
+
+
+moduleColorsgene = labels2colors(net.gene$colors)
+moduleColorspro = labels2colors(net.protein$colors)
+
+
+MEs.gene = net.gene$MEs;
+MEs.pro = net.protein$MEs;
+
+
+geneTree.gene = net.gene$dendrograms[[1]];
+geneTree.pro = net.protein$dendrograms[[1]] 
+
+```
+
+
+```{r module_trait}
+# Define numbers of genes and samples
+nGenes.Gene = ncol(datExprGene);
+nGenes.Protein = ncol(datExprProtein);
+
+nSamples.Gene = nrow(datExprGene);
+nSamples.Protein = nrow(datExprProtein);
+
+# Recalculate MEs with color labels
+MEs0.Gene = moduleEigengenes(datExprGene, moduleColorsgene)$eigengenes
+MEs0.Protein = moduleEigengenes(datExprProtein, moduleColorspro)$eigengenes
+
+MEs.gene = orderMEs(MEs0.Gene)
+MEs.pro = orderMEs(MEs0.Protein)
+
+moduleTraitCor.Gene = cor(MEs.gene, datTraitsGene, use = "p");
+moduleTraitCor.Protein = cor(MEs.pro, datTraitsProtein, use = "p");
+
+moduleTraitPvalue.Gene = corPvalueStudent(moduleTraitCor.Gene, nSamples.Gene)
+moduleTraitPvalue.Protein = corPvalueStudent(moduleTraitCor.Protein, nSamples.Protein)
+
+
+# sizeGrWindow(8,5)
+# Will display correlations and their p-values
+textMatrix.Gene =  paste(signif(moduleTraitCor.Gene, 2), "\n(",
+                    signif(moduleTraitPvalue.Gene, 1), ")", sep = "");
+dim(textMatrix.Gene) = dim(moduleTraitCor.Gene)
+
+textMatrix.Protein =  paste(signif(moduleTraitCor.Protein, 2), "\n(",
+                    signif(moduleTraitPvalue.Protein, 1), ")", sep = "");
+dim(textMatrix.Protein) = dim(moduleTraitCor.Protein)
+
+# Display the correlation values within a heatmap plot
+
+
+pdf("FIG3.5.pdf", width=7, height=5)
+par(mar = c(5, 11, 5, 3));
+
+labeledHeatmap(Matrix = as.matrix(moduleTraitCor.Gene[c(57,63,69),]),
+               xLabels = names(datTraitsGene),
+               yLabels = names(MEs.gene[,c(57,63,69)]),
+               ySymbols = names(MEs.gene[,c(57,63,69)]),
+               colorLabels = FALSE,
+               colors = greenWhiteRed(50),
+               textMatrix = textMatrix.Gene[c(57,63,69)],
+               setStdMargins = FALSE,
+               cex.lab = 1.5,
+               cex.main=2,
+                cex.text=0.9,
+               zlim = c(-1,1),
+               main = paste("Gene Module-trait relationships"))
+
+dev.off()
+
+
+pdf("FIG3.6.pdf", width=8, height=5)
+par(mar = c(5, 12, 5, 3));
+labeledHeatmap(Matrix = as.matrix(moduleTraitCor.Protein[c( "MEgreenyellow", "MEdarkgreen", "MEcyan","MEpurple", "MEdarkolivegreen", "MEdarkred"),]),
+               xLabels = names(datTraitsProtein),
+               yLabels = names(MEs.pro[,c( "MEgreenyellow", "MEdarkgreen", "MEcyan","MEpurple", "MEdarkolivegreen", "MEdarkred")]),
+               ySymbols = names(MEs.pro[,c( "MEgreenyellow", "MEdarkgreen", "MEcyan","MEpurple", "MEdarkolivegreen", "MEdarkred")]),
+               colorLabels = FALSE,
+               colors = greenWhiteRed(50),
+               textMatrix = textMatrix.Protein[c(9,13,37,38,41,42)],
+               setStdMargins = FALSE,
+               cex.lab = 1.5,
+               cex.main=2,
+                cex.text=0.9,
+               zlim = c(-1,1),
+               main = paste("Protein Module-trait relationships"))
+
+dev.off()
+
+
+
+```
+
+
+```{r subtype,echo=FALSE,fig.show='hold', out.width="50%", fig.fullwidth = TRUE, fig.width=5, fig.height=15}
+# Define variable weight containing the weight column of datTrait
+subtype.gene = as.data.frame(datTraitsGene$Subtypes);
+subtype.protein = as.data.frame(datTraitsProtein$Subtypes);
+
+names(subtype.gene) = "subtype"
+names(subtype.protein) = "subtype"
+
+# names (colors) of the modules
+modNames.genes = substring(names(MEs.gene), 3)
+modNames.protein = substring(names(MEs.pro), 3)
+
+geneModuleMembership.gene = as.data.frame(cor(datExprGene, MEs.gene, use = "p"));
+geneModuleMembership.protein = as.data.frame(cor(datExprProtein, MEs.pro, use = "p"));
+
+
+MMPvalue.gene = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership.gene), nSamples.Gene));
+MMPvalue.protein = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership.protein), nSamples.Protein));
+
+
+names(geneModuleMembership.gene) = paste("MM", modNames.genes, sep="");
+names(geneModuleMembership.protein) = paste("MM", modNames.protein, sep="");
+
+
+names(MMPvalue.gene) = paste("p.MM", modNames.genes, sep="");
+names(MMPvalue.protein) = paste("p.MM", modNames.protein, sep="");
+
+
+geneTraitSignificance.gene = as.data.frame(cor(datExprGene, subtype.gene, use = "p"));
+geneTraitSignificance.protein = as.data.frame(cor(datExprProtein, subtype.protein, use = "p"));
+
+GSPvalue.gene = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance.gene), nSamples.Gene));
+GSPvalue.protein = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance.protein), nSamples.Protein));
+
+
+names(geneTraitSignificance.gene) = paste("GS.", names(subtype.gene), sep="");
+names(geneTraitSignificance.protein) = paste("GS.", names(subtype.protein), sep="");
+
+names(GSPvalue.gene) = paste("p.GS.", names(subtype.gene), sep="")
+names(GSPvalue.protein) = paste("p.GS.", names(subtype.protein), sep="")
+```
+
+
+```{r Module membership-gene sig,echo=FALSE,fig.show='hold', out.width="50%", fig.fullwidth = TRUE, fig.width=5, fig.height=5}
+
+
+sig_modules.gene <- c("black", "darkmagenta", "pink")
+
+for (i in 1:length(sig_modules.gene)) {
+module.gene = sig_modules.gene[i]
+column.gene = match(module.gene, modNames.genes);
+moduleGenes = moduleColorsgene==module.gene;
+
+
+verboseScatterplot(abs(geneModuleMembership.gene[moduleGenes, column.gene]),
+                   abs(geneTraitSignificance.gene[moduleGenes, 1]),
+                   xlab = paste("Gene Module Membership in", module.gene, "module"),
+                   ylab = "Gene significance for BC subtype",
+                   main = paste("Module membership vs. gene significance\n"),
+                   cex.main = 1.4, cex.lab = 1.2, cex.axis = 1.2, col = module.gene)
+}
+
+
+
+
+sig_modules.protein <- c(  "greenyellow", "darkgreen", "cyan","purple", "darkolivegreen", "darkred")
+
+for (i in 1:length(sig_modules.protein)) {
+module.protein = sig_modules.protein[i]
+column.protein = match(module.protein, modNames.protein);
+moduleProtein = moduleColorspro==module.protein;
+
+verboseScatterplot(abs(geneModuleMembership.protein[moduleProtein, column.protein]),
+                   abs(geneTraitSignificance.protein[moduleProtein, 1]),
+                   xlab = paste("Protein Module Membership in", module.protein, "module"),
+                   ylab = "Protein significance for BC subtype",
+                   main = paste("Module membership vs. Protein significance\n"),
+                   cex.main = 1.4, cex.lab = 1.2, cex.axis = 1.2, col = module.protein)
+}
+
+
+
+```
+
+```{r}
+text.matrix.gene.df <- as.data.frame(textMatrix.Gene)
+text.matrix.gene.df$Correlation <- str_extract(text.matrix.gene.df$V1, '.*\n') 
+text.matrix.gene.df$Correlation <- sub("\n","",text.matrix.gene.df$Correlation)
+text.matrix.gene.df$Pvalue <- str_extract(text.matrix.gene.df$V1, '\n.*') 
+text.matrix.gene.df$Pvalue <- substr(text.matrix.gene.df$Pvalue,3,7)
+text.matrix.gene.df$Pvalue <- gsub(")","",text.matrix.gene.df$Pvalue)
+text.matrix.gene.df$Correlation <- as.numeric(text.matrix.gene.df$Correlation)
+text.matrix.gene.df$Pvalue <- as.numeric(text.matrix.gene.df$Pvalue)
+
+text.matrix.gene.df$log_pvalue <- -log(text.matrix.gene.df$Pvalue)
+
+text.matrix.gene.df$Significancy <- ifelse(text.matrix.gene.df$Pvalue < 0.05,"Significant","non-Significant")
+
+rownames(text.matrix.gene.df) <- rownames(moduleTraitCor.Gene)
+rownames(text.matrix.gene.df) <- substr(rownames(text.matrix.gene.df),3,30)
+
+
+text.matrix.pro.df <- as.data.frame(textMatrix.Protein)
+text.matrix.pro.df$Correlation <- str_extract(text.matrix.pro.df$V1, '.*\n') 
+text.matrix.pro.df$Correlation <- sub("\n","",text.matrix.pro.df$Correlation)
+text.matrix.pro.df$Pvalue <- str_extract(text.matrix.pro.df$V1, '\n.*') 
+text.matrix.pro.df$Pvalue <- substr(text.matrix.pro.df$Pvalue,3,7)
+text.matrix.pro.df$Pvalue <- gsub(")","",text.matrix.pro.df$Pvalue)
+text.matrix.pro.df$Correlation <- as.numeric(text.matrix.pro.df$Correlation)
+text.matrix.pro.df$Pvalue <- as.numeric(text.matrix.pro.df$Pvalue)
+
+text.matrix.pro.df$log_pvalue <- -log(text.matrix.pro.df$Pvalue)
+
+text.matrix.pro.df$Significancy <- ifelse(text.matrix.pro.df$Pvalue < 0.05001,"Significant","non-Significant")
+
+rownames(text.matrix.pro.df) <- rownames(moduleTraitCor.Protein)
+rownames(text.matrix.pro.df) <- substr(rownames(text.matrix.pro.df),3,30)
+
+
+
+
+
+
+ggplot(text.matrix.gene.df, aes(x=Correlation, y=log_pvalue, color=Significancy)) +
+  geom_point()+  geom_text(aes(label=ifelse(log_pvalue>2.995733,as.character(rownames(text.matrix.gene.df)),'')),hjust=-0.1,vjust=0,position ="identity" )+
+  theme_classic()+ylab("-log(pvalue)")+xlim(-1,1)+theme(legend.position = "non")+scale_color_manual(values=c("#9933FF",
+                             "#339999"))
+
+
+
+
+ggplot(text.matrix.pro.df, aes(x=Correlation, y=log_pvalue, color=Significancy)) +
+  geom_point()+  geom_text(aes(label=ifelse(log_pvalue>2.995732,as.character(rownames(text.matrix.pro.df)),'')),hjust=-0.1,vjust=0,position ="identity" )+
+  theme_classic()+ylab("-log(pvalue)")+xlim(-1,1)+theme(legend.position = "non")+scale_color_manual(values=c("#9933FF",
+                             "#339999"))
+
+```
+
+
+```{r functional G0,echo=FALSE,fig.show='hold', out.width="50%", fig.fullwidth = TRUE, fig.width=10, fig.height=25}
+
+# Functional analysis
+
+modulgenes1 <- names(datExprGene)[moduleColorsgene==sig_modules.gene[1]]
+modulgenes2 <- names(datExprGene)[moduleColorsgene==sig_modules.gene[2]]
+modulgenes3 <- names(datExprGene)[moduleColorsgene==sig_modules.gene[3]]
+
+
+modulgenesproteins1 <- names(datExprProtein)[moduleColorspro==sig_modules.protein[1]]
+modulgenesproteins2 <- names(datExprProtein)[moduleColorspro==sig_modules.protein[2]]
+modulgenesproteins3 <- names(datExprProtein)[moduleColorspro==sig_modules.protein[3]]
+modulgenesproteins4 <- names(datExprProtein)[moduleColorspro==sig_modules.protein[4]]
+modulgenesproteins5 <- names(datExprProtein)[moduleColorspro==sig_modules.protein[5]]
+modulgenesproteins6 <- names(datExprProtein)[moduleColorspro==sig_modules.protein[6]]
+modulgenesproteins7 <- names(datExprProtein)[moduleColorspro==sig_modules.protein[7]]
+
+
+
+geneGO1 <- enrichGO(gene = modulgenes1,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+
+geneGO2 <- enrichGO(gene = modulgenes2,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+
+geneGO3 <- enrichGO(gene = modulgenes3,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+
+# geneGO4 <- enrichGO(gene = modulgenes4,
+#                    OrgDb = org.Hs.eg.db,
+#                    keyType = "SYMBOL",
+#                    ont = "CC",
+#                    pAdjustMethod = "BH",
+#                    pvalueCutoff = 0.05,
+#                    qvalueCutoff = 0.05)
+# geneGO5 <- enrichGO(gene = modulgenes5,
+#                    OrgDb = org.Hs.eg.db,
+#                    keyType = "SYMBOL",
+#                    ont = "CC",
+#                    pAdjustMethod = "BH",
+#                    pvalueCutoff = 0.05,
+#                    qvalueCutoff = 0.05)
+# 
+
+
+
+proteinGO1 <- enrichGO(gene = modulgenesproteins1,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+
+proteinGO2 <- enrichGO(gene = modulgenesproteins2,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+proteinGO3 <- enrichGO(gene = modulgenesproteins3,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+
+proteinGO4 <- enrichGO(gene = modulgenesproteins4,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+proteinGO5 <- enrichGO(gene = modulgenesproteins5,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+
+proteinGO6 <- enrichGO(gene = modulgenesproteins6,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+proteinGO7 <- enrichGO(gene = modulgenesproteins7,
+                   OrgDb = org.Hs.eg.db,
+                   keyType = "SYMBOL",
+                   ont = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+
+
+```
+
+
+
+```{r DEGs-sub-GO,echo=FALSE,fig.show='hold', out.width="50%", fig.fullwidth = TRUE,fig.width=10, fig.height=10}
+geneGO2@result$Log.adj <- -log10(geneGO2@result$p.adjust)
+
+pdf(paste0("FIG3_GO_gene.",sig_modules.gene[2], ".pdf"), width=7, height=9)
+par(mar = c(6, 6, 6, 6));
+barplot(geneGO2,showCategory = 15, font.size = 14, x = "Log.adj")+ggtitle(paste("GO for" , sig_modules.gene[2] ,"\nmodule in gene dataset"))+  theme(title =element_text(size=16, face='bold'),
+ legend.position="none",
+ axis.text=element_text(size=14)) + geom_bar(stat="identity", fill = "lightblue")+scale_x_continuous(breaks=seq(0, 15, 5))+ xlab("-log(adj.pvalue)")
+dev.off()
+
+df.geneGO2 <- as.data.frame(geneGO2@result)[1:15,]
+
+df.geneGO2$Description[3] <- "integral component of lumenal side of \nendoplasmic reticulum membrane"
+df.geneGO2$Description[7] <- "integral component of endoplasmic \nreticulum membrane"  
+df.geneGO2$Description[6] <- "intrinsic component of endoplasmic \nreticulum membrane"
+
+df.geneGO3  <- df.geneGO2 %>%
+  mutate(Description = fct_reorder2(Description, Log.adj,-Log.adj)) %>%  # reorder GOs by GeneRatio
+  ungroup()
+
+
+
+
+ggplot(df.geneGO3, aes(x=Log.adj, y=Description)) + 
+ geom_point() +
+  scale_color_gradient(low = "lightblue", high = "lightblue")+
+ theme_classic() +
+  ylab("Ontology") +
+  xlab("GeneRatio") +
+  ggtitle(paste("GO for" , sig_modules.gene[2] ,"\nmodule in gene dataset")) +xlab("-log(adj.pvalue)")+ylab("") +geom_point(color='lightblue', size=5)+theme(title =element_text(size=16, face='bold', colour = "black"),
+ legend.text = element_text(size=15, colour = "black"), 
+ axis.text=element_text(size=14, colour = "black"))
+
+# barplot(TNBCvsER_up_GO,showCategory = 10, font.size = 16, x = "p.adjust") +ggtitle("GO - TNBCvsER \nUpregulated genes") +  theme(title =element_text(size=16, face='bold'),
+#  legend.position="none", 
+#  axis.text=element_text(size=14)) + geom_bar(stat="identity", fill = "lightblue")+scale_x_continuous(breaks=seq(0, 0.0002, 0.00006))
+
+
+proteinGO1@result$Log.adj <- -log10(proteinGO1@result$p.adjust)
+
+
+
+
+
+df.proteinGO1 <- as.data.frame(proteinGO1@result)[1:15,]
+
+df.proteinGO1$Description[13] <- "integral component of lumenal side of \nendoplasmic reticulum membrane"
+df.proteinGO1$Description[7] <- "integral component of endoplasmic \nreticulum membrane"  
+df.proteinGO1$Description[5] <- "intrinsic component of endoplasmic \nreticulum membrane"
+
+df.proteinGO2  <- df.proteinGO1 %>%
+  mutate(Description = fct_reorder2(Description, Log.adj,-Log.adj)) %>%  # reorder GOs by GeneRatio
+  ungroup()
+
+
+
+
+ggplot(df.proteinGO2, aes(x=Log.adj, y=Description)) + 
+ geom_point() +
+  scale_color_gradient(low = "lightblue", high = "lightblue")+
+  theme_classic() +
+  ylab("Ontology") +
+  xlab("GeneRatio") +
+  ggtitle(paste("GO for" , sig_modules.protein[1] ,"\nmodule in Protein dataset")) +xlab("-log(adj.pvalue)")+ylab("") +geom_point(color='lightblue', size=5)+theme(title =element_text(size=16, face='bold', colour = "black"),
+ legend.text = element_text(size=15, colour = "black"), 
+ axis.text=element_text(size=14, colour = "black"))
+
+
+```
+
+
+```{r eigengenes value distribution across BC subtypes}
+MEs.gene.test <- MEs.gene
+MEs.pro.test <- MEs.pro
+
+MEs.gene.test$group <- c(rep(("HER2"),3),rep(("ER"),8), rep(("TNBC"),6))
+MEs.pro.test$group <-  c(rep(("HER2"),3),rep(("ER"),5), rep(("TNBC"),9))
+
+ggboxplot(MEs.gene.test, x = "group", y = "MEdarkmagenta", 
+          color = "black",fill = "group", palette = c("#FD786F", "#08CB43", "#5F9BFF"),
+          order = c("HER2", "ER", "TNBC"),
+          ylab = "eigengenes values", xlab = "Subtypes")+ggtitle(paste("Distribution of eigengenes\n values of" , sig_modules.gene[2] ,"\ngene module"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=14),legend.position = "none")
+
+
+
+
+ggboxplot(MEs.pro.test, x = "group", y = "MEgreenyellow", 
+          color = "black",fill = "group", palette = c("#FD786F", "#08CB43", "#5F9BFF"),
+          order = c("HER2", "ER", "TNBC"),
+          ylab = "eigengenes values", xlab = "Subtypes")+ggtitle(paste("Distribution of eigengenes\n values of" , sig_modules.protein[1] ,"\nprotein module"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=14),legend.position = "none")
+
+
+kruskal.test(MEdarkmagenta ~ group, data = MEs.gene.test)
+kruskal.test(MEgreenyellow ~ group, data = MEs.pro.test)
+
+```
