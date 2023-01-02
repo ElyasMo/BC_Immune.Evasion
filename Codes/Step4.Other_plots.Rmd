@@ -1,0 +1,188 @@
+---
+title: "Step4.Other_plots"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo                  = TRUE
+                      ,warning              = FALSE
+                      ,message              = FALSE
+                      ,error                = TRUE
+                      ,dev                  = c('png','pdf')
+                      ,pdf.options(encoding = "ISOLatin9.enc", useKerning=FALSE, useDingbats=FALSE)
+)                      
+```
+
+```{r library}
+library(Seurat)
+library(ggplot2)
+library(ggpubr)
+```
+
+
+```{r loading data}
+load("./Step1.Data_processing.Rdata")
+```
+
+```{r DEGs-sub-GO,echo=FALSE,fig.show='hold', out.width="50%", fig.fullwidth = TRUE,fig.width=10, fig.height=5}
+
+MHC_II_genes  <- read.table(file = '../Tcells/QuickGO-annotations-MHCII.tsv', sep = '\t', header = TRUE)
+MHC_II_genes$SYMBOL <- toupper(MHC_II_genes$SYMBOL)
+MHC_II_genes <- MHC_II_genes %>% distinct(SYMBOL, .keep_all = TRUE)
+rownames(MHC_II_genes) <- MHC_II_genes$SYMBOL
+
+BC.Se.mal <- NormalizeData(BC.Se.mal,scale.factor = 10000,verbose = F)
+BC.Se.mal <- FindVariableFeatures(BC.Se.mal, nfeatures = 6000)
+BC.Se.mal <- ScaleData(BC.Se.mal, verbose = FALSE)
+BC.Se.mal <- RunPCA(BC.Se.mal, verbose = FALSE,npcs = 30)
+BC.Se.mal <- RunUMAP(BC.Se.mal, dims = 1:30, verbose = FALSE )
+
+
+protein_seurat$MHCII.percent <- PercentageFeatureSet(protein_seurat, features = intersect(rownames(MHC_II_genes), rownames(protein_seurat@assays$RNA@data)))
+
+BC.Se.mal$MHCII.percent <- PercentageFeatureSet(BC.Se.mal, features = intersect(rownames(MHC_II_genes), rownames(BC.Se.mal@assays$RNA@data)))
+
+BC.Se.mal$Patient <- factor(BC.Se.mal$Patient, levels = c("CID3921","CID4066","CID45171","CID3941","CID3948","CID4067","CID4290A","CID4461",
+                                                          "CID4463","CID4471","CID4530N","CID4535","CID3963","CID4465","CID4495","CID44971",
+                                                          "CID44991","CID4513","CID4515","CID4523"))
+BC.Se.mal$subtype <- factor(BC.Se.mal$subtype, levels = c("HER2+", "ER+", "TNBC"))
+
+DoHeatmap(subset(BC.Se.mal, downsample = 1000), features = c("B2M","HLA-DMA","CD74", "HLA-DRB1","HLA-DRA","HLA-DQA1","PKM"), size = 0, angle = 25,group.by ="subtype" ) +ggtitle("MHCII gene expression") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=12), legend.title = element_text(size=12),
+ axis.text=element_text(size=13))
+  
+DoHeatmap(subset(protein_seurat, downsample = 1000), features = c("B2M","HLA-DMA","CD74", "HLA-DRB1","HLA-DRA","HLA-DQA1","PKM"), size = 0)+ggtitle("MHCII Protein expression") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=12), legend.title = element_text(size=12),
+ axis.text=element_text(size=12))
+
+
+
+DotPlot(BC.Se.mal, features = rownames(MHC_II_genes), group.by  = "subtype") + RotatedAxis()+ggtitle("MHCII Gene expression") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=13))
+
+DotPlot(protein_seurat, features = rownames(MHC_II_genes), group.by  = "subtype") + RotatedAxis()+ RotatedAxis()+ggtitle("MHCII Protein expression") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=14), 
+ axis.text=element_text(size=13))
+
+
+
+```
+
+```{r TCR,echo=FALSE,fig.show='hold', out.width="50%", fig.fullwidth = TRUE,fig.width=20, fig.height=5}
+# TCR gene markers
+Tcell_rec_genes  <- read.table(file = '../Tcells/GO-TCell-receptor-signalling.tsv', sep = '\t', header = TRUE)
+Tcell_rec_genes$SYMBOL <- toupper(Tcell_rec_genes$SYMBOL)
+Tcell_rec_genes <- Tcell_rec_genes %>% distinct(SYMBOL, .keep_all = TRUE)
+rownames(Tcell_rec_genes) <-  Tcell_rec_genes$SYMBOL
+
+
+avg.TCR <- as.data.frame(AverageExpression(CD4,features = rownames(Tcell_rec_genes), group.by = "subtype"))
+
+avg.TCR$stat <- ifelse(avg.TCR$RNA.TNBC > avg.TCR$RNA.ER. & avg.TCR$RNA.TNBC > avg.TCR$RNA.HER2., "keep","lose")
+avg.TCR <- subset(avg.TCR, stat=="keep")
+
+CD4$subtype <- factor(CD4$subtype, levels = c("HER2+","ER+","TNBC"))
+
+DotPlot(CD4, features = rownames(avg.TCR), group.by  = "subtype") + RotatedAxis()+ggtitle("T Cell receptor Gene expression in CD4+ T cells") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=12))
+
+```
+
+```{r Activation of CD4,echo=FALSE,fig.show='hold', out.width="50%", fig.fullwidth = TRUE,fig.width=8, fig.height=5}
+
+#T cell activation markers
+DotPlot(CD4, features = c("FOXP3", "IL2RA", "CD4", "HLA-DRB1","CD27","HLA-DRA", "HLA-F","HLA-DRB5",     "HLA-DQB1",     "HLA-DQA2",      "HLA-DMA",      "HLA-DPA1",     "HLA-DPB1"), group.by = "subtype") + RotatedAxis()+ggtitle("CD4+ activation markers") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=13))
+
+CD4 <- SetIdent(CD4,value = "subtype")
+
+CD4_active_marker <- as.data.frame(AverageExpression(CD4, features = c("FOXP3", "IL2RA", "CD4", "HLA-DRB1","CD27","HLA-DRA", "HLA-F","HLA-DRB5",     "HLA-DQB1",     "HLA-DQA2",      "HLA-DMA",      "HLA-DPA1",     "HLA-DPB1"),group.by = "subtype"))
+
+
+colnames(CD4_active_marker)=c("HER2+","ER+", "TNBC")
+
+
+CD4_active_marker <- data.frame(values=c(CD4_active_marker$`HER2+`, CD4_active_marker$`ER+`, CD4_active_marker$TNBC) , subtypes=c(rep("HER2",13),rep("ER",13), rep("TNBC",13)))
+
+
+ggboxplot(CD4_active_marker, x = "subtypes", y = "values",
+          fill = "subtypes", palette = c("#FD786F", "#08CB43", "#5F9BFF"),
+          order = c("HER2", "ER", "TNBC"),
+          ylab = "Average expression", xlab = "Patients")+ggtitle(paste("Distribution of the expression \nof CD4+ activation markers"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=14),legend.position = "none")+ylim(0,4)
+
+
+kruskal.test(values ~ subtypes, data = subset(CD4_active_marker))
+
+```
+
+
+
+```{r VLNPlots1,echo=FALSE, fig.show='hold', out.width="100%", fig.fullwidth = TRUE, fig.height=8, fig.width=15}
+
+BC.Se.mal <- SetIdent(BC.Se.mal,value = "subtype")
+
+DoHeatmap(subset(BC.Se.mal, downsample = 5000), features = c("MKI67", "MCM2", "MCM6", "TP53","NUSAP1", "ANLN", "CEPA",
+                                "TOP2A","ESPL1","PLK1","TACC3","RTN4","GBP1", "WARS" , "STAT1"), size = 4)+ggtitle("Breast cancer invasiveness markers in Gene level") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=13,colour = "black"))
+
+
+DoHeatmap(subset(protein_seurat, downsample = 1000), features = c("MKI67", "MCM2", "MCM6", "TP53","NUSAP1", "ANLN", "CENPA",
+                                "TOP2A","ESPL1","PLK1","TACC3","RTN4","GBP1", "WARS" , "STAT1"), size = 4)+ggtitle("Breast cancer invasiveness markers in Protein level") +  theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=13,colour = "black"))
+
+
+
+Mal_inv_marker <- as.data.frame(AverageExpression(BC.Se.mal, features = c("MKI67", "MCM2", "MCM6", "TP53","NUSAP1", "ANLN", "CENPA",
+                                "TOP2A","ESPL1","PLK1","TACC3","RTN4","GBP1", "WARS" , "STAT1")))
+
+
+Mal_inv_marker.pro <- as.data.frame(AverageExpression(protein_seurat, features = c("MKI67", "MCM2", "MCM6", "TP53","NUSAP1", "ANLN", "CENPA",
+                                "TOP2A","ESPL1","PLK1","TACC3","RTN4","GBP1", "WARS" , "STAT1")))
+
+
+colnames(Mal_inv_marker)=c("HER2+","ER+", "TNBC")
+colnames(Mal_inv_marker.pro)=c("HER2+","ER+", "TNBC")
+
+
+Mal_inv_marker <- data.frame(values=c(Mal_inv_marker$HER2, Mal_inv_marker$ER, Mal_inv_marker$TNBC) , subtypes=c(rep("HER2+",15),rep("ER+",15), rep("TNBC",15)))
+# CD8_active_marker <- data.frame(values=c(CD8_active_marker$HER2, CD8_active_marker$ER, CD8_active_marker$TNBC) , subtypes=c(rep("HER2",18),rep("ER",18), rep("TNBC",18)))
+Mal_inv_marker.pro <- data.frame(values=c(Mal_inv_marker.pro$HER2, Mal_inv_marker.pro$ER, Mal_inv_marker.pro$TNBC) , subtypes=c(rep("HER2+",14),rep("ER+",14), rep("TNBC",14)))
+
+
+
+Mal_inv_marker$subtypes <- factor(Mal_inv_marker$subtypes, levels = c("HER2+","ER+","TNBC"))
+Mal_inv_marker.pro$subtypes <- factor(Mal_inv_marker.pro$subtypes, levels = c("HER2+","ER+","TNBC"))
+
+
+ggplot(Mal_inv_marker, aes(x = subtypes, y = values, fill = subtypes)) +
+  geom_violin()+ylim(0,1.5)+stat_summary(fun = mean, fun.min = mean, fun.max = mean,
+               geom = "crossbar", 
+               width = 0.25,
+               position = position_dodge(width = .25))+guides(fill = guide_legend(override.aes = list(linetype = 0)),
+         color = guide_legend(override.aes = list(linetype = 0)))+theme_classic()+theme(axis.text = element_text(size = 12,colour = "black"))+rotate_x_text(45)  +theme(axis.title = element_text(size = 14,face = "bold"),strip.text = element_text(size = 12,face = "bold"),legend.position = "none")+ylab("Average gene expression")+ xlab( "BC subtypes")+scale_fill_manual(values=c("#FD786F", "#08CB43", "#5F9BFF"))
+
+
+
+ggplot(Mal_inv_marker.pro, aes(x = subtypes, y = values, fill = subtypes)) +
+  geom_violin()+ylim(-1,3)+stat_summary(fun = mean, fun.min = mean, fun.max = mean,
+               geom = "crossbar", 
+               width = 0.25,
+               position = position_dodge(width = .25))+guides(fill = guide_legend(override.aes = list(linetype = 0)),
+         color = guide_legend(override.aes = list(linetype = 0)))+theme_classic()+theme(axis.text = element_text(size = 12,colour = "black"))+rotate_x_text(45)  +theme(axis.title = element_text(size = 14,face = "bold"),strip.text = element_text(size = 12,face = "bold"),legend.position = "none")+ylab("Average protein expression")+ xlab( "BC subtypes")+scale_fill_manual(values=c("#FD786F", "#08CB43", "#5F9BFF"))
+
+
+kruskal.test(values ~ subtypes, data = Mal_inv_marker)
+kruskal.test(values ~ subtypes, data = Mal_inv_marker.pro)
+
+```
