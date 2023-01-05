@@ -19,7 +19,7 @@ library(Seurat)
 
 ```{r reading the scRNA-seq data}
 # Path to the count matrix of scRNA-seq data from BC patients 
-path= "/mnt/data1/elyas/Single-cell/test-data/Breast-cancer4/"
+path= "./dir"
 
 BC_list <- list("CID3586","CID3838","CID3921","CID3941","CID3946","CID3948","CID3963","CID4040","CID4066","CID4067",
                 "CID4290A","CID4398","CID44041","CID4461","CID4463","CID4465","CID4471","CID4495","CID44971","CID44991",
@@ -43,7 +43,7 @@ BC.Se <- Reduce(merge,BC.Se)
 
 ```{r adding the metadata}
 # Reading in the metadata
-BC_meta <- read.table("/mnt/data1/elyas/Single-cell/test-data/Breast-cancer4/metadata.csv", sep = ",", row.names = 1, header = T)
+BC_meta <- read.table("./dir/metadata.csv", sep = ",", row.names = 1, header = T)
 
 BC_meta <- BC_meta[match(rownames(BC.Se@meta.data),rownames(BC_meta)),]
 
@@ -57,7 +57,6 @@ BC.Se.mal <- SplitObject(BC.Se, split.by = "normal_cell_call")
 BC.Se.mal <- BC.Se.mal$cancer
 
 knitr::kable(table(BC.Se.mal$Patient,BC.Se.mal$celltype_major),caption = "The patients whom their epithelial cells \ncould be distinguished to malignant and normal status")
-
 
 BC.Se <- SplitObject(BC.Se, split.by = "Patient")
 
@@ -87,11 +86,10 @@ BC.Se.inferCNV <- RunPCA(BC.Se.inferCNV, verbose = FALSE)
 BC.Se.inferCNV <- RunUMAP(BC.Se.inferCNV, dims = 1:30, verbose = FALSE)
 
 DimPlot(BC.Se.inferCNV, group.by = "celltype_major")
-
 ```
 
 ```{r reading in the proteomics data}
-protein_normalized <- read_csv("/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/protein_normalized.csv")
+protein_normalized <- read_csv("./dir/protein_normalized.csv")
 protein_normalized <- as.data.frame(protein_normalized[!duplicated(protein_normalized$Gene_Symbol),])
 
 protein_normalized <- protein_normalized[complete.cases(protein_normalized$Gene_Symbol), ]
@@ -112,8 +110,5 @@ protein_seurat <- SetIdent(protein_seurat, value = protein_seurat$subtype)
 ```
 
 ```{r}
-save(BC.Se.inferCNV, BC.Se.mal,CD4,protein_seurat,file = "../Github/Step1.Data_processing.Rdata")
-
+save(BC.Se.inferCNV, BC.Se.mal,CD4,protein_seurat,file = "./dir/Github/Step1.Data_processing.Rdata")
 ```
-
-
