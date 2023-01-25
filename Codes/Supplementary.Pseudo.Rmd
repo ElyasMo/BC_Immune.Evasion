@@ -20,30 +20,30 @@ library(ggpubr)
 # 
 # 
 Newset <- c(
-ER1 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER1/"),
-ER2 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER2/"),
-ER3 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER3/"),
-ER4 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER4/"),
-ER5 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER5/"),
-ER6 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER6/"),
-ER7 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER7/"),
-ER8 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER8/"),
-ER9 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER9/"),
-ER10 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER10/"),
-HER21 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER21/"),
-HER22 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER22/"),
-HER23 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER23/"),
-HER24 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER24/"),
-HER25 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER25/"),
-HER26 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER26/"),
-TNBC1 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC1/"),
-TNBC2 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC2/"),
-TNBC3 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC3/"),
-TNBC4 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC4/"),
-TNBC5 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC5/"),
-TNBC6 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC6/"),
-TNBC7 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC7/"),
-TNBC8 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC8/"))
+ER1 <- Read10X("./New set/ER1/"),
+ER2 <- Read10X("./New set/ER2/"),
+ER3 <- Read10X("./New set/ER3/"),
+ER4 <- Read10X("./New set/ER4/"),
+ER5 <- Read10X("./New set/ER5/"),
+ER6 <- Read10X("./New set/ER6/"),
+ER7 <- Read10X("./New set/ER7/"),
+ER8 <- Read10X("./New set/ER8/"),
+ER9 <- Read10X("./New set/ER9/"),
+ER10 <- Read10X("./New set/ER10/"),
+HER21 <- Read10X("./New set/HER21/"),
+HER22 <- Read10X("./New set/HER22/"),
+HER23 <- Read10X("./New set/HER23/"),
+HER24 <- Read10X("./New set/HER24/"),
+HER25 <- Read10X("./New set/HER25/"),
+HER26 <- Read10X("./New set/HER26/"),
+TNBC1 <- Read10X("./New set/TNBC1/"),
+TNBC2 <- Read10X("./New set/TNBC2/"),
+TNBC3 <- Read10X("./New set/TNBC3/"),
+TNBC4 <- Read10X("./New set/TNBC4/"),
+TNBC5 <- Read10X("./New set/TNBC5/"),
+TNBC6 <- Read10X("./New set/TNBC6/"),
+TNBC7 <- Read10X("./New set/TNBC7/"),
+TNBC8 <- Read10X("./New set/TNBC8/"))
 
 # 
 # 
@@ -60,11 +60,11 @@ Newset <- merge(Newset[[1]], c(Newset[[2]],Newset[[3]],Newset[[4]],Newset[[5]],N
                                Newset[[23]],Newset[[24]],Newset[[25]]),
                add.cell.ids = c("ER1","ER2","ER3","ER4","ER5","ER6","ER7","ER8","ER9","ER1","ER10","HER21","HER22","HER23","HER24","HER25","HER26","TNBC1","TNBC2","TNBC3","TNBC4","TNBC5","TNBC6","TNBC7","TNBC8"), project = "Newset")
 
-saveRDS(Newset, "/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.rds")
+saveRDS(Newset, "./New set/Newset.rds")
 ```
 
 ```{r,fig.width=15}
-Newset <- readRDS("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.rds")
+Newset <- readRDS("./New set/Newset.rds")
 
 Newset[["percent.mt"]] <- PercentageFeatureSet(Newset, pattern = "^MT-")
 
@@ -89,12 +89,12 @@ for (num in c(1:24)) {
 
 Newset <- Reduce(merge,Newset.split)
 
-saveRDS(Newset, "/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.rds")
+saveRDS(Newset, "./New set/Newset.filtered.rds")
 
 ```
 
 ```{r}
-Newset <- readRDS("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.processed.rds")
+Newset <- readRDS("./New set/Newset.filtered.processed.rds")
   
 Newset <- NormalizeData(Newset,assay = "RNA",verbose = F)
 Newset <- FindVariableFeatures(Newset, nfeatures = 4000,verbose = F)
@@ -107,19 +107,19 @@ Newset <- FindClusters(Newset,verbose = F,resolution = c(0.1,0.3,0.4))
 DimPlot(Newset,group.by = "RNA_snn_res.0.4")
 
 Newset <- SetIdent(Newset,value ="RNA_snn_res.0.4" )
-saveRDS(Newset, "/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.processed.rds")
+saveRDS(Newset, "./New set/Newset.filtered.processed.rds")
 
 ```
 
 ```{r, fig.height=7,fig.width=6}
-# Newset <- readRDS("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.rds")
+# Newset <- readRDS("./New set/Newset.filtered.rds")
 
 library(SingleR)
 #Changing the Seurat object to sSinglecell object
 Newset.sce <- as.SingleCellExperiment(Newset,assay = "RNA")
 
 #Determining the path to the annotation libraries
-wpath="/mnt/data1/elyas/Single-cell/libraries/"
+wpath="./Single-cell/libraries/"
 
 #Load references
 blue <- readRDS(paste(wpath,"singleR.BlueprintEncodeData.rds",sep="/"))
@@ -149,7 +149,7 @@ main.labels <- list(blue$label.main, hpca$label.main)
 pred.Newset.main <- SingleR(test=Newset.sce, ref=ref, assay.type.test=1, labels=main.labels)
 saveRDS(pred.Newset.main,"/mnt/data1/elyas//Single-cell/Pseudo_bulk-proteomics/ppred.Newset.main.rds")
 
-refpath="/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/"
+refpath="./Single-cell/Pseudo_bulk-proteomics/"
 #Loading the annotations
 pred.Newset.main <- readRDS(paste0(refpath,"ppred.Newset.main.rds"))
 
@@ -171,14 +171,14 @@ Newset <- SplitObject(Newset,split.by = "SingleR.labels")
 Newset.epi.T <- Reduce(merge, c(Newset$`Epithelial cells`,Newset$`CD4+ T-cells`)) 
 
 
-saveRDS(Newset.epi.T,"/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/Newset.epi.T.all.rds")
+saveRDS(Newset.epi.T,"./Single-cell/Pseudo_bulk-proteomics/Newset.epi.T.all.rds")
 
 ```
 
 
 
 ```{r}
-Newset.epi.T <- readRDS("/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/Newset.epi.T.all.rds")
+Newset.epi.T <- readRDS("./Single-cell/Pseudo_bulk-proteomics/Newset.epi.T.all.rds")
 Newset.epi.T <- SetIdent(Newset.epi.T, value = "SingleR.labels")
 
 Newset.epi.T$Subtype <- "Sybtypes"
