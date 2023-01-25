@@ -1,0 +1,509 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo                  = FALSE
+                      ,warning              = FALSE
+                      ,message              = FALSE
+                      ,error                = TRUE
+                      ,dev                  = c('png','pdf')
+                      ,pdf.options(encoding = "ISOLatin9.enc", useKerning=FALSE, useDingbats=FALSE)
+)
+
+```
+
+```{r,fig.width=7,fig.height=6}
+library(Seurat)
+library(ggpubr)
+# 
+# 
+Newset <- c(
+ER1 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER1/"),
+ER2 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER2/"),
+ER3 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER3/"),
+ER4 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER4/"),
+ER5 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER5/"),
+ER6 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER6/"),
+ER7 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER7/"),
+ER8 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER8/"),
+ER9 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER9/"),
+ER10 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/ER10/"),
+HER21 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER21/"),
+HER22 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER22/"),
+HER23 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER23/"),
+HER24 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER24/"),
+HER25 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER25/"),
+HER26 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/HER26/"),
+TNBC1 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC1/"),
+TNBC2 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC2/"),
+TNBC3 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC3/"),
+TNBC4 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC4/"),
+TNBC5 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC5/"),
+TNBC6 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC6/"),
+TNBC7 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC7/"),
+TNBC8 <- Read10X("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/TNBC8/"))
+
+# 
+# 
+Normal_list <- c("ER1","ER2","ER3","ER4","ER5","ER6","ER7","ER8","ER9","ER1","ER10","HER21","HER22","HER23","HER24","HER25","HER26",
+                 "TNBC1","TNBC2","TNBC3","TNBC4","TNBC5","TNBC6","TNBC7","TNBC8")
+
+Newset <-mapply(function(X,Y){
+  CreateSeuratObject(X, project = Y,assay = "RNA")},X=Newset,Y=Normal_list)
+
+Newset <- merge(Newset[[1]], c(Newset[[2]],Newset[[3]],Newset[[4]],Newset[[5]],Newset[[6]],Newset[[7]],
+                               Newset[[8]],Newset[[9]],Newset[[10]],
+                               Newset[[11]],Newset[[12]],Newset[[13]], Newset[[14]],Newset[[15]],Newset[[16]],Newset[[17]],Newset[[18]],Newset[[19]],
+                               Newset[[20]],Newset[[21]],Newset[[22]],
+                               Newset[[23]],Newset[[24]],Newset[[25]]),
+               add.cell.ids = c("ER1","ER2","ER3","ER4","ER5","ER6","ER7","ER8","ER9","ER1","ER10","HER21","HER22","HER23","HER24","HER25","HER26","TNBC1","TNBC2","TNBC3","TNBC4","TNBC5","TNBC6","TNBC7","TNBC8"), project = "Newset")
+
+saveRDS(Newset, "/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.rds")
+```
+
+```{r,fig.width=15}
+Newset <- readRDS("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.rds")
+
+Newset[["percent.mt"]] <- PercentageFeatureSet(Newset, pattern = "^MT-")
+
+Newset$orig.ident <- factor(Newset$orig.ident, levels =c("ER1",   "ER2",   "ER3",   "ER4",   "ER5" ,  "ER6",   "ER7",   "ER8",   "ER9",   "ER10" , "HER21", "HER22", "HER23", "HER24", "HER25", "HER26", "TNBC1", "TNBC2", "TNBC3", "TNBC4", "TNBC5", "TNBC6", "TNBC7", "TNBC8") )
+
+VlnPlot(Newset,features = "percent.mt")+ scale_y_continuous(limits = c(0, 100), breaks = c(0,10,20,30,40,50,60, 70,80,90,100))
+
+Newset.split <- SplitObject(Newset, split.by = "orig.ident")
+
+for (i in 1:length(Newset.split)) {
+print(FeatureScatter(Newset.split[[i]],feature1 = "nCount_RNA",feature2 = "nFeature_RNA")+ggtitle(i)+
+        scale_y_continuous(limits = c(0, 10000), breaks = c(0,1000,2000,3000,4000,5000,6000, 7000,8000,9000,10000)))
+}
+
+nfeat <- c(6500,6000,3000,1000,4000,3500,5000,6000,3500,5500,4500,3500,3000,5500,6500,5500,6500,5000,5000,5000,5000,4500,5500,5500)
+mt <- c(30,35,13,13,18,10,15, 13,25,25,25,15,13,15,15,25,35,20,7,10,7,15,10,20)
+
+for (num in c(1:24)) {
+  Newset.split[[num]] <- subset(Newset.split[[num]], subset = nFeature_RNA > 300 & nFeature_RNA < nfeat[num] &
+                        percent.mt < mt[num])
+}
+
+Newset <- Reduce(merge,Newset.split)
+
+saveRDS(Newset, "/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.rds")
+
+```
+
+```{r}
+Newset <- readRDS("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.processed.rds")
+  
+Newset <- NormalizeData(Newset,assay = "RNA",verbose = F)
+Newset <- FindVariableFeatures(Newset, nfeatures = 4000,verbose = F)
+Newset <- ScaleData(Newset,verbose = F)
+Newset <- RunPCA(Newset,npcs = 30)
+Newset <- RunUMAP(Newset,dims = 1:30,verbose = F)
+Newset <- FindNeighbors(Newset,dims = 1:30,verbose = F)
+Newset <- FindClusters(Newset,verbose = F,resolution = c(0.1,0.3,0.4))
+
+DimPlot(Newset,group.by = "RNA_snn_res.0.4")
+
+Newset <- SetIdent(Newset,value ="RNA_snn_res.0.4" )
+saveRDS(Newset, "/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.processed.rds")
+
+```
+
+```{r, fig.height=7,fig.width=6}
+# Newset <- readRDS("/mnt/data1/elyas/Single-cell/New_Project/Normal/New set/Newset.filtered.rds")
+
+library(SingleR)
+#Changing the Seurat object to sSinglecell object
+Newset.sce <- as.SingleCellExperiment(Newset,assay = "RNA")
+
+#Determining the path to the annotation libraries
+wpath="/mnt/data1/elyas/Single-cell/libraries/"
+
+#Load references
+blue <- readRDS(paste(wpath,"singleR.BlueprintEncodeData.rds",sep="/"))
+hpca <- readRDS(paste(wpath,"singleR.HumanPrimaryCellAtlasData.rds",sep="/"))
+
+hpca@colData$label.main <- sub("Endothelial_cells","Endothelial cells",hpca@colData$label.main)
+hpca@colData$label.main <- sub("Epithelial_cells","Epithelial cells",hpca@colData$label.main)
+
+hpca@colData$label.fine <- sub("Endothelial_cells","Endothelial cells",hpca@colData$label.fine)
+hpca@colData$label.fine <- sub("Epithelial_cells","Epithelial cells",hpca@colData$label.fine)
+
+types_to_use <- c("Epithelial cells","Endothelial cells","B-cells","CD4+ T-cells","CD8+ T-cells" ,"Monocytes",
+	"Macrophage","NK_cell","Fibroblasts","Myelocyte","Keratinocytes","Adipocytes")
+blue <- blue[,(colData(blue)$label.main %in% types_to_use)]
+hpca <- hpca[,(colData(hpca)$label.main %in% types_to_use)]
+
+
+#Combining to libraries for a better annotation
+ref <- list(BP=blue,HPCA=hpca)
+
+# Disinguishing the main and fine libraries (main has the major annotations and fine includes the cell subtypes as well)
+main.labels <- list(blue$label.main, hpca$label.main)
+
+
+
+# Annotationg the cells. It is time consuming so I saved it in .rds files for the sake of time and computational process in code repetition.
+pred.Newset.main <- SingleR(test=Newset.sce, ref=ref, assay.type.test=1, labels=main.labels)
+saveRDS(pred.Newset.main,"/mnt/data1/elyas//Single-cell/Pseudo_bulk-proteomics/ppred.Newset.main.rds")
+
+refpath="/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/"
+#Loading the annotations
+pred.Newset.main <- readRDS(paste0(refpath,"ppred.Newset.main.rds"))
+
+#Adding the annotations to the objects 
+Newset.celllabels2 <- cbind(celllabelsb=pred.Newset.main$labels)
+rownames(Newset.celllabels2) <- colnames(Newset)
+Newset <- AddMetaData(Newset, as.data.frame(Newset.celllabels2))
+
+tab <- table(cluster=Newset$RNA_snn_res.0.4, label=pred.Newset.main$labels) 
+pheatmap::pheatmap(log10(tab+20),fontsize = 12,cluster_rows = F) # using a larger pseudo-count for smoothing. 
+
+Newset <- AddMetaData(Newset, metadata = pred.Newset.main$labels, col.name = "SingleR.labels")
+DimPlot(Newset,group.by = "SingleR.labels")
+
+```
+
+```{r}
+Newset <- SplitObject(Newset,split.by = "SingleR.labels")
+Newset.epi.T <- Reduce(merge, c(Newset$`Epithelial cells`,Newset$`CD4+ T-cells`)) 
+
+
+saveRDS(Newset.epi.T,"/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/Newset.epi.T.all.rds")
+
+```
+
+
+
+```{r}
+Newset.epi.T <- readRDS("/mnt/data1/elyas/Single-cell/Pseudo_bulk-proteomics/Newset.epi.T.all.rds")
+Newset.epi.T <- SetIdent(Newset.epi.T, value = "SingleR.labels")
+
+Newset.epi.T$Subtype <- "Sybtypes"
+Newset.epi.T$Subtype[grep("TNBC", Newset.epi.T$orig.ident)] <- "TNBC"
+Newset.epi.T$Subtype[grep("ER+", Newset.epi.T$orig.ident)] <- "ER+"
+Newset.epi.T$Subtype[grep("HER", Newset.epi.T$orig.ident)] <- "HER2+"
+
+Newset.epi.T <- SetIdent(Newset.epi.T,value = "Subtype")
+Newset.epi.T <- SplitObject(Newset.epi.T, split.by = "SingleR.labels")
+Newset.epi.T$`Epithelial cells`$Subtype <- factor(Newset.epi.T$`Epithelial cells`$Subtype, levels = c("HER2+","ER+","TNBC"))
+```
+
+
+```{r}
+Newset.epi.T$`Epithelial cells`<- AddModuleScore(Newset.epi.T$`Epithelial cells`, features =c("HLA-DMA", "CD74","HLA-DRB1","HLA-DRA","HLA-DQA1","PKM"),name = c("HLA-DMA", "CD74","HLA-DRB1","HLA-DRA","HLA-DQA1","PKM"))
+
+x=c()
+  for (i in 1:6) {
+    y <- c(Newset.epi.T$`Epithelial cells`@meta.data[,14:19][,i])
+    x <- c(x,y)
+  }
+
+gene.list <- c("HLA-DMA", "CD74","HLA-DRB1","HLA-DRA","HLA-DQA1","PKM")
+
+list <- c()
+for (i in gene.list) {
+  first <- c(rep(i,length(Newset.epi.T$`Epithelial cells`$PKM6)))
+  list <- c(list,first)
+}
+
+
+MHC.score <- data.frame(score = x,
+           subtype = rep(Newset.epi.T$`Epithelial cells`$Subtype,6), Gene=list)
+
+names(MHC.score) = c("score","subtype","gene")
+
+
+ggboxplot(MHC.score, x = "subtype", y = "score", fill = "subtype",order = c("HER2+", "ER+", "TNBC"),
+          ylab = "Expression scores", xlab = "BC patients")+ggtitle(paste("MHCII gene expression"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15),
+ axis.text=element_text(size=14),legend.position = "none")+ylim(0,4)
+
+
+kruskal.test(score ~ subtype, data = subset(MHC.score,score>0))
+
+```
+
+```{r,fig.width=14,fig.height=6}
+list <- c("HLA-DMA", "CD74","HLA-DRB1","HLA-DRA","HLA-DQA1","PKM")
+
+p1 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[14],group.by = "Subtype")+xlim(0,3)+ggtitle(list[1])
+p2 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[15],group.by = "Subtype")+xlim(0,3)+ggtitle(list[2])
+p3 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[16],group.by = "Subtype")+xlim(0,3)+ggtitle(list[3])
+p4<- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[17],group.by = "Subtype")+xlim(0,3)+ggtitle(list[4])
+p5 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[18],group.by = "Subtype")+xlim(0,3)+ggtitle(list[5])
+p6 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[19],group.by = "Subtype")+xlim(0,3)+ggtitle(list[6])
+
+p.1 <- ggarrange(p1,p2,p3,p4,p5,p6, ncol = 3,nrow = 3)
+p.1
+```
+
+
+
+```{r}
+Newset.epi.T$`Epithelial cells`<- AddModuleScore(Newset.epi.T$`Epithelial cells`, features =c("MKI67","MCM2", "MCM6","ANLN","CENPA","RTN4","GBP1"),name = c("MKI67","MCM2", "MCM6","ANLN","CENPA","RTN4","GBP1"))
+
+scores=c()
+  for (i in 1:7) {
+    y <- c(Newset.epi.T$`Epithelial cells`@meta.data[,20:26][,i])
+    scores <- c(scores,y)
+  }
+
+gene.list <- c("MKI67","MCM2", "MCM6","ANLN","CENPA","RTN4","GBP1")
+
+list <- c()
+for (i in gene.list) {
+  x <- c(rep(i,length(Newset.epi.T$`Epithelial cells`$GBP17)))
+  list <- c(list,x)
+}
+
+
+Inv.score <- data.frame(score = scores,
+           subtype = rep(Newset.epi.T$`Epithelial cells`$Subtype,7), Gene=list,
+           patient=rep(Newset.epi.T$`Epithelial cells`$orig.ident,7))
+names(Inv.score) = c("score","subtype","gene","patient")
+
+
+
+ggboxplot(Inv.score, x = "subtype", y = "score",fill = "subtype",order = c("HER2+", "ER+", "TNBC"),
+          ylab = "Expression scores", xlab = "BC patients")+ggtitle(paste("Invasivness markers"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=14),legend.position = "none")+ylim(0,4)
+
+
+kruskal.test(score ~ subtype, data = subset(Inv.score,score>0))
+```
+
+```{r,fig.width=14,fig.height=10}
+list <- c("MKI67","MCM2", "MCM6","ANLN","CENPA","RTN4","GBP1")
+
+p1 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[20])+xlim(0,3)+ggtitle(list[1])
+p2 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[21])+xlim(0,3)+ggtitle(list[2])
+p3 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[22])+xlim(0,3)+ggtitle(list[3])
+p4<- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[23])+xlim(0,3)+ggtitle(list[4])
+p5 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[24])+xlim(0,3)+ggtitle(list[5])
+p6 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[25])+xlim(0,3)+ggtitle(list[6])
+p7 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[26])+xlim(0,3)+ggtitle(list[7])
+
+p.2 <- ggarrange(p1,p2,p3,p4,p5,p6,p7, ncol = 3,nrow = 3)
+p.2
+```
+
+
+```{r}
+Metastatic_cyt <- c("VEGFA", "TGFB1", "CCL2", "CTSL" , "IGFBP7", "CSF1", "FAS")
+Angiogenesis_cyt <- c("IL8", "IL17B", "IL19", "IL30", "IL10", "VEGFA", "IL33", "OSM")
+Immu_supress_cyt <- c("IL10", "TGFB1", "IL10RB")
+
+Newset.epi.T$`Epithelial cells` <- AddModuleScore(Newset.epi.T$`Epithelial cells`,features = Metastatic_cyt,name = paste0("Metastatic_cyt","_",Metastatic_cyt))
+Newset.epi.T$`Epithelial cells` <- AddModuleScore(Newset.epi.T$`Epithelial cells`,features = Angiogenesis_cyt[-c(1,4)],name = paste0("Angiogenesis_cyt","_",Angiogenesis_cyt[-c(1,4)]))
+Newset.epi.T$`Epithelial cells` <- AddModuleScore(Newset.epi.T$`Epithelial cells`,features = Immu_supress_cyt,name = paste0("Immu_supress_cyt",Immu_supress_cyt))
+```
+
+
+
+
+
+```{r}
+scores.Met=c()
+  for (i in 1:7) {
+    y <- c(Newset.epi.T$`Epithelial cells`@meta.data[,27:33][,i])
+    scores.Met <- c(scores.Met,y)
+  }
+
+gene.list <- c("VEGFA", "TGFB1", "CCL2", "CTSL" , "IGFBP7", "CSF1", "FAS")
+
+list <- c()
+for (i in gene.list) {
+  x <- c(rep(i,length(Newset.epi.T$`Epithelial cells`$Immu_supress_cytIL10RB3)))
+  list <- c(list,x)
+}
+
+
+Met.Inv.score <- data.frame(score = scores.Met,
+           subtype = rep(Newset.epi.T$`Epithelial cells`$Subtype,7), Gene=list,
+           patient=rep(Newset.epi.T$`Epithelial cells`$orig.ident,7))
+names(Met.Inv.score) = c("score","subtype","gene","patient")
+
+
+# Met.Inv.score <- subset(Met.Inv.score, gene!="VEGFA" & gene != "IGFBP7")
+# Inv.score <- subset(Inv.score,score > 0)
+
+ggboxplot(Met.Inv.score, x = "subtype", y = "score",fill = "subtype",order = c("HER2+", "ER+", "TNBC"),
+          ylab = "Expression scores", xlab = "BC patients")+ggtitle(paste("Metastatic cytokines"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=14),legend.position = "none")+ylim(0,4)+facet_wrap(~gene,ncol = 5)+rotate_x_text(45)
+
+
+kruskal.test(score ~ subtype, data = subset(Met.Inv.score,score>0))
+
+```
+
+
+```{r,fig.width=14,fig.height=14}
+p1 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[27])+xlim(0,2.5)
+p2 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[28])+xlim(0,2.5)
+p3 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[29])+xlim(0,2.5)
+p4<- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[30])+xlim(0,2.5)
+p5 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[31])+xlim(0,2.5)
+p6 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[32])+xlim(0,2.5)
+p7 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[33])+xlim(0,2.5)
+
+
+p <- ggarrange(p1,p2,p3,p4,p5,p6,p7, ncol = 3,nrow = 4)
+p
+```
+
+```{r,fig.height=15}
+
+scores.Met=c()
+  for (i in 1:6) {
+    y <- c(Newset.epi.T$`Epithelial cells`@meta.data[,34:39][,i])
+    scores.Met <- c(scores.Met,y)
+  }
+
+gene.list <- c( "IL17B", "IL19", "IL10", "VEGFA", "IL33", "OSM")
+
+list <- c()
+for (i in gene.list) {
+  x <- c(rep(i,length(Newset.epi.T$`Epithelial cells`$Immu_supress_cytIL10RB3)))
+  list <- c(list,x)
+}
+
+
+Ang.Inv.score <- data.frame(score = scores.Met,
+           subtype = rep(Newset.epi.T$`Epithelial cells`$Subtype,6), Gene=list,
+           patient=rep(Newset.epi.T$`Epithelial cells`$orig.ident,6))
+names(Ang.Inv.score) = c("score","subtype","gene","patient")
+
+# Ang.Inv.score <- subset(Ang.Inv.score, gene !="VEGFA")
+# Inv.score <- subset(Inv.score,score > 0)
+
+ggboxplot(Ang.Inv.score, x = "subtype", y = "score",fill = "subtype",order = c("HER2+", "ER+", "TNBC"),
+          ylab = "Expression scores", xlab = "BC patients")+ggtitle(paste("Angiogenesis cytokines"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=14),legend.position = "none")+facet_wrap(~gene)+rotate_x_text(45)
+
+
+kruskal.test(score ~ subtype, data = subset(Ang.Inv.score,score>0))
+
+RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data[,34:39]))+xlim(0,2.5)
+```
+
+```{r,fig.width=14,fig.height=14}
+p1 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[34])+xlim(0,2.5)
+p2 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[35])+xlim(0,2.5)
+p3 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[36])+xlim(0,2.5)
+p4<- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[37])+xlim(0,2.5)
+p5 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[38])+xlim(0,2.5)
+p6 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[39])+xlim(0,2.5)
+
+
+p.3 <- ggarrange(p1,p2,p3,p4,p5,p6, ncol = 3,nrow = 4)
+p.3
+```
+
+```{r}
+
+scores.Met=c()
+  for (i in 1:3) {
+    y <- c(Newset.epi.T$`Epithelial cells`@meta.data[,40:42][,i])
+    scores.Met <- c(scores.Met,y)
+  }
+
+gene.list <- c("IL10", "TGFB1", "IL10RB")
+
+list <- c()
+for (i in gene.list) {
+  x <- c(rep(i,length(Newset.epi.T$`Epithelial cells`$Immu_supress_cytIL10RB3)))
+  list <- c(list,x)
+}
+
+
+Imm.Inv.score <- data.frame(score = scores.Met,
+           subtype = rep(Newset.epi.T$`Epithelial cells`$Subtype,3), Gene=list,
+           patient=rep(Newset.epi.T$`Epithelial cells`$orig.ident,3))
+names(Imm.Inv.score) = c("score","subtype","gene","patient")
+
+
+# Inv.score <- subset(Inv.score,score > 0)
+
+ggboxplot(Imm.Inv.score, x = "subtype", y = "score",fill = "subtype",order = c("HER2+", "ER+", "TNBC"),
+          ylab = "Expression scores", xlab = "BC patients")+ggtitle(paste("Immunosupressive cytokines"))+ theme(title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15), 
+ axis.text=element_text(size=14),legend.position = "none")+ylim(0,4)+facet_wrap(~gene)+rotate_x_text(45)
+
+
+kruskal.test(score ~ subtype, data = subset(Imm.Inv.score,score>0))
+
+RidgePlot(Newset.epi.T$`Epithelial cells`, features = names(Newset.epi.T$`Epithelial cells`@meta.data)[40:42])+xlim(0,2.5)
+
+```
+
+```{r,fig.height=8}
+Newset.epi.T$`Epithelial cells`$MHCII.mean <- rowMeans(Newset.epi.T$`Epithelial cells`@meta.data[14:19])
+Newset.epi.T$`Epithelial cells`$Inv.mean <- rowMeans(Newset.epi.T$`Epithelial cells`@meta.data[20:26])
+Newset.epi.T$`Epithelial cells`$Met.cyt.mean <- rowMeans(Newset.epi.T$`Epithelial cells`@meta.data[27:33])
+Newset.epi.T$`Epithelial cells`$Ang.cyt.mean <- rowMeans(Newset.epi.T$`Epithelial cells`@meta.data[34:39])
+Newset.epi.T$`Epithelial cells`$Imm.cyt.mean <- rowMeans(Newset.epi.T$`Epithelial cells`@meta.data[40:42])
+
+
+p1 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = "MHCII.mean", group.by = "Subtype")+theme_classic()+xlim(0,3)+ggtitle("MHCII")+theme(legend.position = "none",title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15),
+ axis.text=element_text(size=14))
+
+p2 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = "Inv.mean", group.by = "Subtype")+xlim(0,1)+theme_classic()+ggtitle("Invasiveness")+theme(legend.position = "none",title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15),
+ axis.text=element_text(size=14))+ scale_x_continuous(limits = c(0, 1), breaks = c(0,0.5,1))
+
+p3 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = "Met.cyt.mean", group.by = "Subtype")+xlim(0,1)+ggtitle("Metastatic cytokines")+theme_classic()+theme(legend.position = "none",title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15),
+ axis.text=element_text(size=14))+ scale_x_continuous(limits = c(0, 1), breaks = c(0,0.5,1))
+
+p4 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = "Ang.cyt.mean", group.by = "Subtype")+xlim(0,1)+ggtitle("Angiogenesis cytokines")+theme_classic()+theme(legend.position = "none",title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15),
+ axis.text=element_text(size=14))+ scale_x_continuous(limits = c(0, 1), breaks = c(0,0.5,1))
+
+p5 <- RidgePlot(Newset.epi.T$`Epithelial cells`, features = "Imm.cyt.mean", group.by = "Subtype")+theme_classic()+xlim(0,1)+ggtitle("Immunosupressive cytokines")+theme(legend.position = "none",title =element_text(size=16, face='bold'),
+ legend.text = element_text(size=15),
+ axis.text=element_text(size=14))+ scale_x_continuous(limits = c(0, 1), breaks = c(0,0.5,1))
+
+ggarrange(p1,p2,p3,p4,p5,ncol = 3,nrow = 2)
+```
+
+
+
+```{r}
+DotPlot(Newset.epi.T$`Epithelial cells`,features = c(names(Newset.epi.T$`Epithelial cells`@meta.data)[14:19]),scale = F)+rotate_x_text(45)+ggtitle("Metastatic cytokines\n in CD4+ T cells")
+
+
+```
+
+```{r,fig.height=3,fig.width=6}
+Newset.epi.T$`CD4+ T-cells` <- FindVariableFeatures(Newset.epi.T$`CD4+ T-cells`,nfeatures = 4000)
+Newset.epi.T$`CD4+ T-cells` <- ScaleData(Newset.epi.T$`CD4+ T-cells`,assay = "RNA",verbose = F)
+
+p1 <- DotPlot(Newset.epi.T$`CD4+ T-cells`,features = c("FOXP3", "IL2RA", "CD4","CD27","HLA-DRA", "HLA-F","HLA-DRB5", "HLA-DQA2",      "HLA-DMA",    "HLA-DPB1"))+rotate_x_text(45)+ggtitle("Activation markers\n in CD4+ T cells")
+```
+
+```{r,fig.height=3,fig.width=6}
+Metastatic_cyt <- c("VEGFA", "IL33", "TGFB1", "SMAD6", "INHBC", "CCL2", "CTSL" , "IGFBP7", "IL6", "CSF1", "FAS", "IL7")
+Angiogenesis_cyt <- c("IL8", "IL17B", "IL19", "IL30", "IL10","IL6", "VEGFA", "IL33", "OSM")
+Immu_supress_cyt <- c("IL10", "TGFB1", "IL10RB")
+
+p2 <- DotPlot(Newset.epi.T$`CD4+ T-cells`,features = c("IL10", "TGFB1", "IL10RB"))+rotate_x_text(45)+ggtitle("Angiogenesis cytokines\n in CD4+ T cells")
+
+p3 <- DotPlot(Newset.epi.T$`CD4+ T-cells`,features = c( "TGFB1", "SMAD6", "IGFBP7", "IL6", "FAS", "IL7"))+rotate_x_text(45)+ggtitle("Metastatic cytokines\n in CD4+ T cells")
+
+p4 <- DotPlot(Newset.epi.T$`CD4+ T-cells`,features = c("IL8", "IL17B", "IL19", "IL30", "IL10", "OSM"))+rotate_x_text(45)+ggtitle("Immunosupressive cytokines\n in CD4+ T cells")
+
+```
+
+```{r,fig.width=12}
+ggarrange(p1,p2,p3,p4, nrow = 2,ncol = 2)
+
+```
+
+
